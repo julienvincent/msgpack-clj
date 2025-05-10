@@ -73,7 +73,29 @@
 (def ^:private default-pack-opts
   {:key-fn stringify-keys-mapper})
 
+(def ^:no-doc ?PackOpts
+  [:map
+   [:key-fn {:optional true} [:function
+                              [:-> :any :any]]]])
+
 (defn pack
+  "Pack the given `value` into a msgpack byte-array.
+
+  Accepts an optional `opts` map containing:
+
+  - **`:key-fn`** - A function accepting the key of a map being packed. Can be
+    used to efficiently cast map keys to new types. Defaults to the
+    [[stringify-keys-mapper]] fn.
+
+  Example:
+
+  ```clojure
+  (pack {:a 1} {:key-fn stringify-keys-mapper})
+  (pack [1 2 3])
+  ```"
+  {:malli/schema [:function
+                  [:-> :any bytes?]
+                  [:-> :any ?PackOpts bytes?]]}
   ([value] (pack value {}))
   ([value opts]
    (let [packer (MessagePack/newDefaultBufferPacker)
@@ -81,7 +103,15 @@
      (pack- packer value opts)
      (MessageBufferPacker/.toByteArray packer))))
 
+(def ^:no-doc ?OutputStream
+  [:fn {:error/message "Should be an instance of OutputStream"}
+   (partial instance? OutputStream)])
+
 (defn pack-stream
+  "Like [[pack]] but writes the packed bytes directly into a given `stream`."
+  {:malli/schema [:function
+                  [:-> ?OutputStream :any :nil]
+                  [:-> ?OutputStream :any ?PackOpts :nil]]}
   ([^OutputStream stream value] (pack-stream stream value {}))
   ([^OutputStream stream value opts]
    (let [packer (MessagePack/newDefaultPacker stream)
@@ -152,7 +182,40 @@
 
     :else (throw (ex-info "Unsupported resource type" {:type (type resource)}))))
 
+(def ^:no-doc ?UnpackOpts
+  [:map
+   [:key-fn {:optional true} [:function
+                              [:-> :any :any]]]])
+
+(def ^:no-doc ?Resource
+  [:or
+   bytes?
+   [:fn {:error/message "Should be an instance of InputStream"}
+    (partial instance? InputStream)]])
+
 (defn unpack
+  "Unpack a msgpack value from a given `resource`.
+
+  The `resource` can be any one of:
+
+  - A byte-array
+  - A type implementing [[java.io.InputStream]]
+
+  Accepts an optional `opts` map containing:
+
+  - **`:key-fn`** - A function accepting the key of a map being unpacked. Can
+    be used to efficiently cast map keys to new types.
+
+  Example:
+
+  ```clojure
+  (unpack (pack {:a 1})) ;; => {\"a\" 1}
+  (unpack (pack {:a 1}) {:key-fn keywordize-keys-mapper}) ;; => {:a 1}
+  (unpack (io/input-stream (pack 1))) ;; => 1
+  ```"
+  {:malli/schema [:function
+                  [:-> ?Resource :any]
+                  [:-> ?Resource ?UnpackOpts :any]]}
   ([resource] (unpack resource {}))
   ([resource opts]
    (let [unpacker (into-unpacker resource)]
