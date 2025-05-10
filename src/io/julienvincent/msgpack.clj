@@ -62,7 +62,8 @@
     (or (sequential? value)
         (set? value)) (pack-sequential packer value opts)
 
-    :else (throw (ex-info "Unsupported datatype" {:type (type value)}))))
+    :else (throw (IllegalArgumentException.
+                  (str "Unsupported datatype of type " (type value))))))
 
 (defn stringify-keys-mapper [k]
   (if (keyword? k)
@@ -182,7 +183,8 @@
     (bytes? resource)
     (MessagePack/newDefaultUnpacker ^bytes resource)
 
-    :else (throw (ex-info "Unsupported resource type" {:type (type resource)}))))
+    :else (throw (IllegalArgumentException.
+                  (str "Unsupported resource type " (type resource))))))
 
 (def ^:no-doc ?UnpackOpts
   [:map

@@ -66,3 +66,8 @@
         sink (PipedOutputStream. source)]
     (msgpack/pack-stream sink {:a 1})
     (is {"a" 1} (msgpack/unpack source))))
+
+(deftest unsupported-datatype
+  (is (thrown-with-msg? IllegalArgumentException
+                        #"Unsupported datatype of type class clojure.lang.Keyword"
+                        (msgpack/pack :a))))
