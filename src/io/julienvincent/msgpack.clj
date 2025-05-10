@@ -47,7 +47,9 @@
   (cond
     (instance? Integer value) (MessagePacker/.packInt packer value)
     (instance? Long value) (MessagePacker/.packLong packer value)
-    (instance? java.math.BigInteger value) (MessagePacker/.packBigInteger packer value)
+    (instance? BigInteger value) (MessagePacker/.packBigInteger packer value)
+    (instance? Short value) (MessagePacker/.packShort packer value)
+
     (float? value) (MessagePacker/.packFloat packer value)
     (string? value) (MessagePacker/.packString packer value)
     (boolean? value) (MessagePacker/.packBoolean packer value)
