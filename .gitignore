@@ -1,0 +1,10 @@
+.clj-kondo
+.lsp
+.cpcache
+.DS_Store
+
+target
+classes
+
+.nrepl-port
+deps.local.edn
