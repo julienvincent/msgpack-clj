@@ -44,7 +44,7 @@ Please find the documentation at **https://cljdoc.org/d/io.julienvincent/msgpack
    [io.julienvincent.msgpack :refer [pack unpack keywordize-keys-mapper]]))
 
 ;; Pack into a byte-array
-(pack (pack {:a 1 "b" [1 2 3]})) ;; => {"a" 1 "b" [1 2 3]}
+(unpack (pack {:a 1 "b" [1 2 3]})) ;; => {"a" 1 "b" [1 2 3]}
 
 ;; Specify a custom key-fn
 (unpack (pack {:a 1} {:key-fn str})) ;; => {":a" 1}
@@ -202,8 +202,6 @@ Execution time sample std-deviation : 11.766116 ns
 
 </details>
 
-<br />
-
 As this implementation doesn't support stringifying/keywordizing map keys the data was prepared in advance using
 `clojure.walk/stringify-keys` so that all keys were pre-transformed from keywords to strings.
 
@@ -264,8 +262,6 @@ Execution time sample std-deviation : 239.538394 ns
 ```
 
 </details>
-
-<br />
 
 Now we really see the impact, and how the `:key-fn` from `msgpack-clj` can make a very significant real-world
 difference.
