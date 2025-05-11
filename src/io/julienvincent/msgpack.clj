@@ -98,11 +98,11 @@
   ```"
   {:malli/schema [:function
                   [:-> :any bytes?]
-                  [:-> :any ?PackOpts bytes?]]}
-  ([value] (pack value {}))
+                  [:-> :any [:maybe ?PackOpts] bytes?]]}
+  ([value] (pack value nil))
   ([value opts]
    (let [packer (MessagePack/newDefaultBufferPacker)
-         opts (merge default-pack-opts opts)]
+         opts (or default-pack-opts opts)]
      (pack- packer value opts)
      (MessageBufferPacker/.toByteArray packer))))
 
@@ -114,11 +114,11 @@
   "Like [[pack]] but writes the packed bytes directly into a given `stream`."
   {:malli/schema [:function
                   [:-> ?OutputStream :any :nil]
-                  [:-> ?OutputStream :any ?PackOpts :nil]]}
-  ([^OutputStream stream value] (pack-stream stream value {}))
+                  [:-> ?OutputStream :any [:maybe ?PackOpts] :nil]]}
+  ([^OutputStream stream value] (pack-stream stream value nil))
   ([^OutputStream stream value opts]
    (let [packer (MessagePack/newDefaultPacker stream)
-         opts (merge default-pack-opts opts)]
+         opts (or opts default-pack-opts)]
      (pack- packer value opts)
      (MessagePacker/.flush packer)
      nil)))
@@ -219,7 +219,7 @@
   ```"
   {:malli/schema [:function
                   [:-> ?Resource :any]
-                  [:-> ?Resource ?UnpackOpts :any]]}
+                  [:-> ?Resource [:maybe ?UnpackOpts] :any]]}
   ([resource] (unpack resource {}))
   ([resource opts]
    (let [unpacker (into-unpacker resource)]
