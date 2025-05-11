@@ -1,6 +1,8 @@
 (ns io.julienvincent.msgpack
   (:import
    clojure.lang.PersistentArrayMap
+   clojure.lang.PersistentHashMap
+   clojure.lang.PersistentVector
    java.io.InputStream
    java.io.OutputStream
    org.msgpack.core.MessageBufferPacker
@@ -126,26 +128,46 @@
 (declare ^:private -unpack)
 
 (defn- unpack-array [unpacker opts]
-  (let [length (MessageUnpacker/.unpackArrayHeader unpacker)]
-    (loop [arr (transient [])
-           i 0]
+  (let [length (MessageUnpacker/.unpackArrayHeader unpacker)
+        arr (object-array length)]
+    (loop [i 0]
       (if (< i length)
-        (recur (conj! arr (-unpack unpacker opts))
-               (inc i))
-        (persistent! arr)))))
+        (do (aset arr i (-unpack unpacker opts))
+            (recur (inc i)))
+        (PersistentVector/adopt arr)))))
 
 (defn- unpack-map [unpacker opts]
   (let [length (MessageUnpacker/.unpackMapHeader unpacker)
         key-fn (:key-fn opts)]
-    (loop [map (transient {})
-           i 0]
-      (if (< i length)
-        (recur (assoc! map
-                       (cond-> (-unpack unpacker opts)
-                         key-fn key-fn)
-                       (-unpack unpacker opts))
-               (inc i))
-        (persistent! map)))))
+    (if (< 8 length)
+      ;; When associng into a transient PersistentArrayMap, created using
+      ;; (transient {}), clojure will convert the map into a PersistentHashMap
+      ;; when the size grows past 8 entries.
+      ;;
+      ;; As we know the size will be greater than 8 up front we can create a
+      ;; transient PHM directly instead to avoid this re-allocation.  
+      (loop [map (transient PersistentHashMap/EMPTY)
+             i 0]
+        (if (< i length)
+          (recur (assoc! map
+                         (cond-> (-unpack unpacker opts)
+                           key-fn key-fn)
+                         (-unpack unpacker opts))
+                 (inc i))
+          (persistent! map)))
+
+      ;; For maps with 8 or fewer elements it's faster to allocate an object
+      ;; array and later wrap it with a PersistentArrayMap when we are done
+      ;; unpacking into it. 
+      (let [length (* length 2)
+            arr (object-array length)]
+        (loop [i 0]
+          (if (< i length)
+            (do (aset arr i (cond-> (-unpack unpacker opts)
+                              key-fn key-fn))
+                (aset arr (inc i) (-unpack unpacker opts))
+                (recur (+ i 2)))
+            (PersistentArrayMap. arr)))))))
 
 (defn- unpack-binary [unpacker]
   (let [length (MessageUnpacker/.unpackBinaryHeader unpacker)

@@ -13,10 +13,10 @@ This is a wrapper around the official Java implementation for msgpack
 ([msgpack-java](https://github.com/msgpack/msgpack-java)) which has a larger community and is generally well maintained.
 
 This implementation tries to be as low-overhead as possible, providing the high-performance translations from
-msgpack-java into clojure datatypes.
+msgpack-java into Clojure data types.
 
 It supports packing to/from `byte-arrays` as well as directly to `InputStreams` and `OutputStreams`. It also exposes an
-API for transforming clojure map keys during pack/unpack, commonly used for stringifying/keywordizing map keys.
+API for transforming Clojure map keys during pack/unpack, commonly used for stringifying/keywordizing map keys.
 
 ## Index
 
@@ -137,18 +137,14 @@ Found 2 outliers in 60 samples (3.3333 %)
 aarch64 Mac OS X 14.3 12 cpu(s)
 OpenJDK 64-Bit Server VM 21.0.4+7-LTS
 Runtime arguments: -XX:-OmitStackTraceInFastThrow -Djdk.attach.allowAttachSelf -XX:+UseG1GC -XX:-OmitStackTraceInFastThrow -Djdk.attach.allowAttachSelf -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -Dclojure.basis=.cpcache/3981153520.basis
-Evaluation count : 15104760 in 60 samples of 251746 calls.
-      Execution time sample mean : 3.972117 µs
-             Execution time mean : 3.972168 µs
-Execution time sample std-deviation : 13.345495 ns
-    Execution time std-deviation : 13.700262 ns
-   Execution time lower quantile : 3.945115 µs ( 2.5%)
-   Execution time upper quantile : 3.998236 µs (97.5%)
+Evaluation count : 19289820 in 60 samples of 321497 calls.
+      Execution time sample mean : 3.337379 µs
+             Execution time mean : 3.336836 µs
+Execution time sample std-deviation : 102.240464 ns
+    Execution time std-deviation : 103.556693 ns
+   Execution time lower quantile : 3.113501 µs ( 2.5%)
+   Execution time upper quantile : 3.494902 µs (97.5%)
                    Overhead used : 1.370423 ns
-
-Found 1 outliers in 60 samples (1.6667 %)
-	low-severe	 1 (1.6667 %)
- Variance from outliers : 1.6389 % Variance is slightly inflated by outliers
 ```
 
 </details>
