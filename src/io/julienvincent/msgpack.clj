@@ -17,21 +17,21 @@
 (defn- pack-map [packer ^PersistentArrayMap value opts]
   (MessagePacker/.packMapHeader packer (count value))
   (let [key-fn (:key-fn opts)]
-    (reduce-kv (fn [_ key value]
+    (reduce-kv (fn [acc key value]
                  (pack- packer (cond-> key key-fn key-fn) opts)
                  (pack- packer value opts)
-                 nil)
+                 acc)
                nil
                value)))
 
 (defn- pack-vector [packer value opts]
   (let [len (count value)]
     (MessagePacker/.packArrayHeader packer len)
-    (dotimes [i len]
-      ;; Using the vector-as-a-function accessor is one of the fastest ways of
-      ;; accessing a value from a vector. It is constant time and has very
-      ;; little overhead.
-      (pack- packer (value i) opts))))
+    (reduce (fn [acc element]
+              (pack- packer element opts)
+              acc)
+            nil
+            value)))
 
 (defn- pack-bytes [packer ^bytes value]
   (let [len (alength value)]
