@@ -23,14 +23,15 @@ API for transforming Clojure map keys during pack/unpack, commonly used for stri
 - **[Features](#features)**
 - **[Documentation](https://cljdoc.org/d/io.julienvincent/msgpack)**
 - **[Examples](#examples)**
+- **[DataType Extensions](#datatype-extensions)**
 - **[Micro Benchmarks](#micro-benchmarks)**
 
 ## Features
 
 - Serialize to/from byte-arrays
 - Serialize to/from Input/Output streams
-- Transform map keys during pack/unpack using a provided key-fn
-- Provide datatype extensions [TODO]
+- Transform map keys during pack/unpack using a provided `:key-fn`
+- Custom data type extensions
 
 ## Documentation
 
@@ -59,6 +60,43 @@ Please find the documentation at **https://cljdoc.org/d/io.julienvincent/msgpack
 ;; Unpack from a stream
 (with-open [stream (input-stream "test.dat")]
   (unpack stream)) ;; => {"a" 1}
+```
+
+## DataType Extensions
+
+The msgpack spec defines support for custom data type extensions. These can be provided to msgpack-clj through the
+`opts` map when calling pack/unpack.
+
+An extension is a type implementing the **[MsgpackExtension](src/io/julienvincent/msgpack/extension.clj)** protocol
+which should provide an implementation for packing and unpacking custom data types.
+
+There are also a set of extensions for common Clojure data types provided as part of msgpack-clj which can be found at
+`io.julienvincent.msgpack.extension.clojure/extensions`. These include:
+
+- `clojure.lang.Keyword`
+- `clojure.lang.symbol`
+- `clojure.lang.IPersistentSet`
+
+Please keep in mind that these are **NOT** registered by default.
+
+For examples of how to define your own custom extension you can take a look at the built-in extensions provided by
+msgpack-clj.
+
+To use these extensions or your own custom extensions, provide them to the `:extensions` key in the pack/unpack `opts`
+map:
+
+```clojure
+(ns user
+  (:require
+   [io.julienvincent.msgpack :as msgpack]
+   [io.julienvincent.msgpack.extension.clojure :as ext.clj]))
+
+(def opts
+  {:extensions ext.clj/extensions})
+
+(msgpack/unpack
+ (msgpack/pack 'some-symbol opts)
+ opts) ;; => 'some-symbol
 ```
 
 ## Micro Benchmarks

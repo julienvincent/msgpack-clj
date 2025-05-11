@@ -1,10 +1,13 @@
 (ns io.julienvincent.msgpack
+  (:require
+   [io.julienvincent.msgpack.extension :as extension])
   (:import
    clojure.lang.PersistentArrayMap
    clojure.lang.PersistentHashMap
    clojure.lang.PersistentVector
    java.io.InputStream
    java.io.OutputStream
+   org.msgpack.core.ExtensionTypeHeader
    org.msgpack.core.MessageBufferPacker
    org.msgpack.core.MessageFormat
    org.msgpack.core.MessagePack
@@ -14,14 +17,14 @@
 
 (set! *warn-on-reflection* true)
 
-(declare ^:private pack-)
+(declare ^:private -pack)
 
 (defn- pack-map [packer ^PersistentArrayMap value opts]
   (MessagePacker/.packMapHeader packer (count value))
   (let [key-fn (:key-fn opts)]
     (reduce-kv (fn [acc key value]
-                 (pack- packer (cond-> key key-fn key-fn) opts)
-                 (pack- packer value opts)
+                 (-pack packer (cond-> key key-fn key-fn) opts)
+                 (-pack packer value opts)
                  acc)
                nil
                value)))
@@ -30,7 +33,7 @@
   (let [len (count value)]
     (MessagePacker/.packArrayHeader packer len)
     (reduce (fn [acc element]
-              (pack- packer element opts)
+              (-pack packer element opts)
               acc)
             nil
             value)))
@@ -43,9 +46,9 @@
 (defn- pack-sequential [packer value opts]
   (MessagePacker/.packArrayHeader packer (count value))
   (doseq [element value]
-    (pack- packer element opts)))
+    (-pack packer element opts)))
 
-(defn- pack- [packer value opts]
+(defn- -pack [packer value opts]
   (cond
     (instance? Integer value) (MessagePacker/.packInt packer value)
     (instance? Long value) (MessagePacker/.packLong packer value)
@@ -61,11 +64,32 @@
     (vector? value) (pack-vector packer value opts)
     (bytes? value) (pack-bytes packer value)
 
-    (or (sequential? value)
-        (set? value)) (pack-sequential packer value opts)
+    (sequential? value) (pack-sequential packer value opts)
 
-    :else (throw (IllegalArgumentException.
-                  (str "Unsupported datatype of type " (type value))))))
+    :else
+    (let [packed? (reduce
+                   (fn [acc extension]
+                     (if (extension/can-pack? extension value)
+                       (do (extension/pack extension packer value opts)
+                           (reduced true))
+                       acc))
+                   false
+                   (:extensions opts))
+
+          ;; This is a fallback for sets - if none of the extensions handled the
+          ;; set type then we pack it as a vector.
+          ;;
+          ;; We don't do this by default to allow registering a custom extension
+          ;; for sets.
+          packed? (if (and (not packed?)
+                           (set? value))
+                    (do (pack-sequential packer value opts)
+                        true)
+                    packed?)]
+
+      (when-not packed?
+        (throw (IllegalArgumentException.
+                (str "Unsupported datatype of type " (type value))))))))
 
 (defn stringify-keys-mapper [k]
   (if (keyword? k)
@@ -81,7 +105,8 @@
 (def ^:no-doc ?PackOpts
   [:map
    [:key-fn {:optional true} [:function
-                              [:-> :any :any]]]])
+                              [:-> :any :any]]]
+   [:extensions {:optional true} [:vector extension/?MsgpackExtension]]])
 
 (defn pack
   "Pack the given `value` into a msgpack byte-array.
@@ -91,6 +116,8 @@
   - **`:key-fn`** - A function accepting the key of a map being packed. Can be
     used to efficiently cast map keys to new types. Defaults to the
     [[stringify-keys-mapper]] fn.
+  - **`:extensions`** - A vector of custom msgpack data type extensions that
+    will be used to pack non-standard datatypes.
 
   Example:
 
@@ -101,11 +128,11 @@
   {:malli/schema [:function
                   [:-> :any bytes?]
                   [:-> :any [:maybe ?PackOpts] bytes?]]}
-  ([value] (pack value nil))
-  ([value opts]
+  (^bytes [value] (pack value nil))
+  (^bytes [value opts]
    (let [packer (MessagePack/newDefaultBufferPacker)
-         opts (or default-pack-opts opts)]
-     (pack- packer value opts)
+         opts (or opts default-pack-opts)]
+     (-pack packer value opts)
      (MessageBufferPacker/.toByteArray packer))))
 
 (def ^:no-doc ?OutputStream
@@ -121,7 +148,7 @@
   ([^OutputStream stream value opts]
    (let [packer (MessagePack/newDefaultPacker stream)
          opts (or opts default-pack-opts)]
-     (pack- packer value opts)
+     (-pack packer value opts)
      (MessagePacker/.flush packer)
      nil)))
 
@@ -175,6 +202,20 @@
     (MessageUnpacker/.readPayload unpacker buf)
     buf))
 
+(defn- unpack-extension [unpacker opts]
+  (let [header (MessageUnpacker/.unpackExtensionTypeHeader unpacker)
+        type (ExtensionTypeHeader/.getType header)
+        value (reduce
+               (fn [acc extension]
+                 (if (extension/can-unpack? extension type)
+                   (reduced (extension/unpack extension unpacker header opts))
+                   acc))
+               ::unknown
+               (:extensions opts))]
+    (when (= ::unknown value)
+      (Exception. (str "Unknown extension type " type)))
+    value))
+
 (defn- unpack-number [unpacker format]
   (condp = format
     MessageFormat/UINT64 (MessageUnpacker/.unpackBigInteger unpacker)
@@ -195,7 +236,9 @@
         ValueType/INTEGER (unpack-number unpacker format)
         ValueType/BINARY (unpack-binary unpacker)
         ValueType/ARRAY (unpack-array unpacker opts)
-        ValueType/MAP (unpack-map unpacker opts)))))
+        ValueType/MAP (unpack-map unpacker opts)
+
+        ValueType/EXTENSION (unpack-extension unpacker opts)))))
 
 (defn- into-unpacker [resource]
   (cond
@@ -211,7 +254,8 @@
 (def ^:no-doc ?UnpackOpts
   [:map
    [:key-fn {:optional true} [:function
-                              [:-> :any :any]]]])
+                              [:-> :any :any]]]
+   [:extensions {:optional true} [:vector extension/?MsgpackExtension]]])
 
 (def ^:no-doc ?Resource
   [:or
@@ -231,6 +275,8 @@
 
   - **`:key-fn`** - A function accepting the key of a map being unpacked. Can
     be used to efficiently cast map keys to new types.
+  - **`:extensions`** - A vector of custom msgpack data type extensions that
+    will be used to unpack non-standard datatypes.
 
   Example:
 
