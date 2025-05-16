@@ -48,6 +48,10 @@
   (is (= {} (msgpack/unpack (msgpack/pack {}))))
   (is (= {"a" 1} (msgpack/unpack (msgpack/pack {"a" 1})))))
 
+(deftest unpack-large-array
+  (let [data (mapv (constantly 1) (range 33))]
+    (is (= data (msgpack/unpack (msgpack/pack data))))))
+
 (deftest pack-unpack-binary
   (let [value (msgpack/unpack (msgpack/pack (byte-array 0)))]
     (is (bytes? value))

@@ -155,13 +155,21 @@
 (declare ^:private -unpack)
 
 (defn- unpack-array [unpacker opts]
-  (let [length (MessageUnpacker/.unpackArrayHeader unpacker)
-        arr (object-array length)]
-    (loop [i 0]
-      (if (< i length)
-        (do (aset arr i (-unpack unpacker opts))
-            (recur (inc i)))
-        (PersistentVector/adopt arr)))))
+  (let [length (MessageUnpacker/.unpackArrayHeader unpacker)]
+    (if (<= length 32)
+      (let [arr (object-array length)]
+        (loop [i 0]
+          (if (< i length)
+            (do (aset arr i (-unpack unpacker opts))
+                (recur (inc i)))
+            (PersistentVector/adopt arr))))
+      (loop [arr (transient [])
+             i 0]
+        (if (< i length)
+          (recur
+           (conj! arr (-unpack unpacker opts))
+           (inc i))
+          (persistent! arr))))))
 
 (defn- unpack-map [unpacker opts]
   (let [length (MessageUnpacker/.unpackMapHeader unpacker)
