@@ -155,16 +155,22 @@
 (declare ^:private -unpack)
 
 (defn- unpack-array [unpacker opts]
-  (let [length (MessageUnpacker/.unpackArrayHeader unpacker)]
-    (if (<= length 32)
-      (let [arr (object-array length)]
-        (loop [i 0]
-          (if (< i length)
-            (do (aset arr i (-unpack unpacker opts))
-                (recur (inc i)))
-            (PersistentVector/adopt arr))))
-      (loop [arr (transient [])
-             i 0]
+  (let [length (MessageUnpacker/.unpackArrayHeader unpacker)
+
+        arr-len (if (> length 32)
+                  32
+                  length)
+
+        base-arr (object-array arr-len)
+        base-vec (loop [i 0]
+                   (if (< i arr-len)
+                     (do (aset base-arr i (-unpack unpacker opts))
+                         (recur (inc i)))
+                     (PersistentVector/adopt base-arr)))]
+    (if (= arr-len length)
+      base-vec
+      (loop [arr (transient base-vec)
+             i arr-len]
         (if (< i length)
           (recur
            (conj! arr (-unpack unpacker opts))
