@@ -1,7 +1,7 @@
-{:deps {org.msgpack/msgpack-core {:mvn/version "0.9.9"}}
+{:deps {org.msgpack/msgpack-core {:mvn/version "0.9.12"}}
 
- :aliases {:build {:extra-deps {io.github.clojure/tools.build {:mvn/version "0.10.8"}
-                                com.kepler16/kaven {:mvn/version "1.0.0-alpha.1"}}
+ :aliases {:build {:extra-deps {io.github.clojure/tools.build {:mvn/version "0.10.14"}
+                                com.kepler16/kaven {:mvn/version "1.0.0"}}
                    :ns-default build
                    :extra-paths ["build"]}
 
